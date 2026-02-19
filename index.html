@@ -422,6 +422,7 @@
                 <thead>
                 <tr>
                     <th>Date</th>
+                    <th>Day</th>
                     <th>PIC (Created By)</th>
                     <th>First Time</th>
                     <th>Last Time</th>
@@ -501,11 +502,15 @@
         let rawData = [];
         let processedRows = [];
         let availableDates = [];
+        let availableShiftDates = []; // New: for shift-based dates
         let plantGroupedData = [];
         let currentFilterDate = 'ALL';
         let qtyColIndex = -1;
         let picFilterValue = '';
 
+        // Day of week mapping
+        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', e => {
@@ -584,6 +589,10 @@
             rawData = [];
             processedRows = [];
 
+            // Sets for date collections
+            const calendarDatesSet = new Set();
+            const shiftDatesSet = new Set();
+
             dataRows.forEach(row => {
                 const dpTimeRaw = row[colIndex.dpTime];
                 const plant = row[colIndex.plantName] ? row[colIndex.plantName].toString().trim() : '';
@@ -635,8 +644,40 @@
                     } else return;
                 }
 
+                // Create proper timestamp for chronological comparison
+                let timestamp = null;
+                if (dpDateRaw instanceof Date) {
+                    timestamp = new Date(dpDateRaw);
+                    timestamp.setHours(hour, minute, 0, 0);
+                } else if (typeof dpDateRaw === 'number') {
+                    // Excel serial date
+                    const d = XLSX.SSF.parse_date_code(dpDateRaw);
+                    timestamp = new Date(d.y, d.m - 1, d.d, hour, minute, 0, 0);
+                } else {
+                    const str = dpDateRaw.toString().trim();
+                    const d = new Date(str);
+                    if (!isNaN(d)) {
+                        timestamp = new Date(d);
+                        timestamp.setHours(hour, minute, 0, 0);
+                    }
+                }
+
+                // Calculate shift date (handle overnight shifts)
+                let shiftDate = dateStr;
+                if (hour < 8 && hour >= 0) {
+                    // Shift continues from previous day (00:00-08:00)
+                    const d = new Date(timestamp);
+                    d.setDate(d.getDate() - 1);
+                    shiftDate = d.toISOString().split('T')[0];
+                }
+                // Add to sets
+                calendarDatesSet.add(dateStr);
+                shiftDatesSet.add(shiftDate);
+
                 processedRows.push({
-                    date: dateStr,
+                    date: dateStr,        // Calendar date
+                    shiftDate: shiftDate,  // Shift-based date (for overnight shifts)
+                    timestamp: timestamp,  // Full timestamp for chronological comparison
                     timeStr: timeStr,
                     hour: hour,
                     minute: minute,
@@ -654,14 +695,15 @@
             });
 
             // unique dates
-            const datesSet = new Set(processedRows.map(r => r.date));
-            availableDates = Array.from(datesSet).sort();
+            availableDates = Array.from(calendarDatesSet).sort();
+            availableShiftDates = Array.from(shiftDatesSet).sort();
 
             // populate date filters
-            [dateFilterPlant, dateFilterPic].forEach(sel => {
-                sel.innerHTML = '<option value="ALL">All Dates</option>' +
-                    availableDates.map(d => `<option value="${d}">${d}</option>`).join('');
-            });
+            dateFilterPlant.innerHTML = '<option value="ALL">All Dates</option>' +
+                availableDates.map(d => `<option value="${d}">${d}</option>`).join('');
+            
+            dateFilterPic.innerHTML = '<option value="ALL">All Dates</option>' +
+                availableShiftDates.map(d => `<option value="${d}">${d}</option>`).join('');
             
             // Initialize date range pickers for Tab 4
             if (availableDates.length > 0) {
@@ -830,9 +872,9 @@
             const selectedDate = dateFilterPic.value;
             let filtered = processedRows;
             
-            // Filter by date
+            // Filter by shift date (not calendar date)
             if (selectedDate !== 'ALL') {
-                filtered = filtered.filter(r => r.date === selectedDate);
+                filtered = filtered.filter(r => r.shiftDate === selectedDate);
             }
             
             // Filter by PIC name
@@ -843,58 +885,100 @@
                 );
             }
 
-            // group by date & pic
-            const picGroups = {};
-            filtered.forEach(r => {
-                const key = `${r.date}|${r.pic}`;
-                if (!picGroups[key]) {
-                    picGroups[key] = {
-                        date: r.date,
-                        pic: r.pic,
-                        firstHour: r.hour,
-                        firstMin: r.minute,
-                        firstStr: r.timeStr,
-                        lastHour: r.hour,
-                        lastMin: r.minute,
-                        lastStr: r.timeStr,
-                        count: 1,
-                        totalQty: r.qty
-                    };
-                } else {
-                    const cur = r.hour*60 + r.minute;
-                    const first = picGroups[key].firstHour*60 + picGroups[key].firstMin;
-                    const last = picGroups[key].lastHour*60 + picGroups[key].lastMin;
-                    if (cur < first) {
-                        picGroups[key].firstHour = r.hour;
-                        picGroups[key].firstMin = r.minute;
-                        picGroups[key].firstStr = r.timeStr;
-                    }
-                    if (cur > last) {
-                        picGroups[key].lastHour = r.hour;
-                        picGroups[key].lastMin = r.minute;
-                        picGroups[key].lastStr = r.timeStr;
-                    }
-                    picGroups[key].count++;
-                    picGroups[key].totalQty += r.qty;
+            // Group all rows by PIC first
+            const picData = {};
+            filtered.forEach(row => {
+                if (!picData[row.pic]) {
+                    picData[row.pic] = [];
                 }
+                picData[row.pic].push(row);
             });
 
-            const picList = Object.values(picGroups).sort((a,b) => a.date.localeCompare(b.date) || a.pic.localeCompare(b.pic));
+            // Sort each PIC's data by timestamp
+            Object.keys(picData).forEach(pic => {
+                picData[pic].sort((a, b) => a.timestamp - b.timestamp);
+            });
+
+            // Now group each PIC's data into shifts (8-hour rule)
+            const shifts = [];
+            Object.keys(picData).forEach(pic => {
+                const picRows = picData[pic];
+                if (picRows.length === 0) return;
+                
+                // Start with the first row as the beginning of a shift
+                let currentShift = {
+                    pic: pic,
+                    firstTimestamp: picRows[0].timestamp,
+                    firstStr: picRows[0].timeStr,
+                    lastTimestamp: picRows[0].timestamp,
+                    lastStr: picRows[0].timeStr,
+                    count: 1,
+                    totalQty: picRows[0].qty,
+                    startDate: picRows[0].date
+                };
+                
+                // Process the rest of the rows
+                for (let i = 1; i < picRows.length; i++) {
+                    const row = picRows[i];
+                    const timeDiffHours = (row.timestamp - currentShift.lastTimestamp) / (1000 * 60 * 60);
+                    
+                    // If time difference is less than 8 hours, it's part of the same shift
+                    if (timeDiffHours < 8) {
+                        currentShift.lastTimestamp = row.timestamp;
+                        currentShift.lastStr = row.timeStr;
+                        currentShift.count++;
+                        currentShift.totalQty += row.qty;
+                    } else {
+                        // Time difference is 8+ hours, so it's a new shift
+                        shifts.push(currentShift);
+                        currentShift = {
+                            pic: pic,
+                            firstTimestamp: row.timestamp,
+                            firstStr: row.timeStr,
+                            lastTimestamp: row.timestamp,
+                            lastStr: row.timeStr,
+                            count: 1,
+                            totalQty: row.qty,
+                            startDate: row.date
+                        };
+                    }
+                }
+                
+                // Add the last shift
+                shifts.push(currentShift);
+            });
+
+            // Filter by selected date (if needed)
+            if (selectedDate !== 'ALL') {
+                shifts = shifts.filter(shift => shift.startDate === selectedDate);
+            }
+
+            // Sort shifts by start date and PIC name
+            shifts.sort((a, b) => {
+                if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+                return a.pic.localeCompare(b.pic);
+            });
 
             let html = '';
             let totalDP = 0;
             let totalQty = 0;
             
-            picList.forEach(p => {
-                totalDP += p.count;
-                totalQty += p.totalQty;
+            shifts.forEach(shift => {
+                totalDP += shift.count;
+                totalQty += shift.totalQty;
+                
+                // Get day of the week for the start date
+                const dateObj = new Date(shift.startDate);
+                const dayOfWeek = daysOfWeek[dateObj.getDay()];
+                
                 html += `<tr>
-                    <td>${p.date}</td>
-                    <td>${p.pic || '-'}</td>
-                    <td>${p.firstStr}</td>
-                    <td>${p.lastStr}</td>
-                    <td>${p.count}</td>
-                    <td>${p.totalQty.toLocaleString('en-US')}</td>
+                    <td>${shift.startDate}</td>
+                    <td>${dayOfWeek}</td>
+                    <td>${shift.pic || '-'}</td>
+                    <td>${shift.firstStr}</td>
+                    <td>${shift.lastStr}</td>
+                    <td>${shift.count}</td>
+                    <td>${shift.totalQty.toLocaleString('en-US')}</td>
                 </tr>`;
             });
             
@@ -907,7 +991,7 @@
             }
             
             picSummaryDiv.innerHTML = `
-                📌 Total ${picList.length} PIC entries per day${filterInfo}.
+                📌 Total ${shifts.length} PIC shifts${filterInfo}.
                 <br>📊 Total DP: <strong>${totalDP.toLocaleString('en-US')}</strong> | Total Qty: <strong>${totalQty.toLocaleString('en-US')}</strong>
             `;
         }
