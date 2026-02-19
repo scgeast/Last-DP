@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Data Fingerprint / DP</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f4f7fc;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+            position: relative;
+        }
+        /* Header dengan judul dan upload area di pojok */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .app-header h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 1.8rem;
+        }
+        .upload-area {
+            background: #ecf0f1;
+            border: 2px dashed #b0c4de;
+            border-radius: 12px;
+            padding: 8px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .upload-area:hover {
+            background: #d5dbdb;
+        }
+        .upload-area input {
+            display: none;
+        }
+        .file-name {
+            margin-left: 10px;
+            font-weight: 500;
+            color: #27ae60;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-weight: 500;
+            clear: both;
+        }
+        h3 {
+            color: #34495e;
+            margin: 20px 0 10px;
+        }
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border-radius: 16px;
+            padding: 15px 20px;
+            box-shadow: 5px 5px 15px #d1d9e6, -5px -5px 15px #ffffff;
+            flex: 0 1 auto;
+            min-width: 180px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.1);
+        }
+        .stat-card.active {
+            border-color: #3498db;
+            background: #ebf5ff;
+        }
+        .stat-card .date {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        .stat-card .total {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #2980b9;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .stat-card .after-15 {
+            font-size: 1rem;
+            color: #e67e22;
+            display: inline-block;
+        }
+        .filter-panel {
+            background: #f8fafd;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #dde2e8;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+            padding: 14px 8px;
+            text-align: center;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e0e7ef;
+            text-align: center;
+        }
+        tr:hover {
+            background: #f5f9ff;
+        }
+        .badge {
+            background: #27ae60;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge.warning {
+            background: #e67e22;
+        }
+        .badge.secondary {
+            background: #7f8c8d;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: #ecf0f1;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+            box-shadow: 0 4px 8px rgba(52,152,219,0.4);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .date-picker {
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        .alert {
+            background: #fef9e7;
+            border-left: 5px solid #f1c40f;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .footer-note {
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-style: italic;
+            text-align: center;
+        }
+        /* New styles for date range picker */
+        .date-range-picker {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .date-range-label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        .date-range-input {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .summary-footer {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        /* PIC filter styling */
+        .pic-filter-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .pic-filter-input {
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid #ccc;
+            min-width: 250px;
+        }
+        
+        /* New styles for the heading to span 7 columns */
+        .stats-heading {
+            width: 100%;
+            text-align: center;
+            margin: 0 0 15px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .stats-heading::before {
+            content: "🌿";
+            font-size: 1.8rem;
+        }
+        
+        /* Adjust card layout for 7 columns */
+        @media (min-width: 1200px) {
+            .stats-container {
+                display: grid;
+                grid-template-columns: repeat(7, 1fr);
+                gap: 15px;
+                margin-bottom: 30px;
+            }
+            
+            .stat-card {
+                min-width: auto;
+            }
+        }
+        
+        @media (max-width: 1199px) {
+            .stats-container {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
+        
+        @media (max-width: 991px) {
+            .stats-container {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .stats-container {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (max-width: 575px) {
+            .stats-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header dengan judul dan upload area kecil di pojok kanan -->
+    <div class="app-header">
+        <h1>📊 Analisis Data DP (Delivery Order)</h1>
+        <div class="upload-area" id="uploadArea">
+            <span>📂 Upload File</span>
+            <input type="file" id="fileInput" accept=".xls,.xlsx">
+            <span id="fileName" class="file-name"></span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab1">🏭 Plant Aktif > 15:00</button>
+        <button class="tab-btn" data-tab="tab2">⏱️ Analisis PIC per Hari</button>
+        <button class="tab-btn" data-tab="tab4">📊 Volume per Head</button>
+    </div>
+
+    <!-- Tab 1: Plant Aktif setelah 15:00 -->
+    <div id="tab1" class="tab-content active">
+        <!-- Updated heading to span 7 columns -->
+        <div class="stats-heading">Ringkasan Plant per Hari</div>
+        
+        <!-- Kartu statistik per tanggal akan dirender di sini -->
+        <div id="dailyStats" class="stats-container"></div>
+
+        <div class="flex-between">
+            <h3 id="selectedDateTitle">Detail Plant untuk Semua Tanggal</h3>
+            <div>
+                <label>Atau filter tanggal: </label>
+                <select id="dateFilterPlant" class="date-picker">
+                    <option value="ALL">Semua Tanggal</option>
+                </select>
+                <button id="resetDateFilter" class="tab-btn" style="padding: 8px 16px;">Reset</button>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="plantTable">
+                <thead>
+                <tr><th>Tanggal</th><th>Plant Name</th><th>Jam Terakhir</th><th>Status</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="alert">
+            <strong>Analisis:</strong> <span id="plantSummary"></span>
+        </div>
+    </div>
+
+    <!-- Tab 2: Analisis PIC per hari (dengan filter PIC) -->
+    <div id="tab2" class="tab-content">
+        <div class="flex-between">
+            <h2>👤 Jam Pertama & Terakhir Create DP per PIC</h2>
+            <div class="pic-filter-container">
+                <div>
+                    <label>Filter tanggal: </label>
+                    <select id="dateFilterPic" class="date-picker"></select>
+                </div>
+                <div>
+                    <label>Cari PIC: </label>
+                    <input type="text" id="picFilter" class="pic-filter-input" placeholder="Nama PIC..." autocomplete="off">
+                </div>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="picTable">
+                <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>PIC (Created By)</th>
+                    <th>Jam Pertama</th>
+                    <th>Jam Terakhir</th>
+                    <th>Total DP</th>
+                    <th>Total Qty</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="alert" id="picSummary"></div>
+    </div>
+
+    <!-- Tab 4: Volume per Head -->
+    <div id="tab4" class="tab-content">
+        <div class="flex-between">
+            <h2>👥 Volume per Head (PIC)</h2>
+            <div class="date-range-picker">
+                <span class="date-range-label">Rentang Tanggal:</span>
+                <input type="date" id="volumeStartDate" class="date-range-input">
+                <span>s/d</span>
+                <input type="date" id="volumeEndDate" class="date-range-input">
+                <button id="applyVolumeFilter" class="tab-btn">Terapkan Filter</button>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="volumeTable">
+                <thead>
+                    <tr>
+                        <th>PIC (Created By)</th>
+                        <th>Total Qty</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="summary-footer" id="volumeSummaryFooter">
+            Total Volume: 0
+        </div>
+        <div class="alert" id="volumeSummary">
+            Analisis volume pengiriman per PIC (Created By) berdasarkan total kuantitas (Qty)
+        </div>
+    </div>
+
+    <div class="footer-note">
+        ⏱️ Analisis berdasarkan kolom "DP Time", "Created By", dan "QTY". File contoh: RMC cek Finger print ...
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+    (function() {
+        // ---------- DOM Elements ----------
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDiv = document.getElementById('fileName');
+
+        const dailyStatsDiv = document.getElementById('dailyStats');
+        const dateFilterPlant = document.getElementById('dateFilterPlant');
+        const dateFilterPic = document.getElementById('dateFilterPic');
+        const picFilterInput = document.getElementById('picFilter');
+        const resetDateFilterBtn = document.getElementById('resetDateFilter');
+        const plantTbody = document.querySelector('#plantTable tbody');
+        const picTbody = document.querySelector('#picTable tbody');
+        const plantSummarySpan = document.getElementById('plantSummary');
+        const picSummaryDiv = document.getElementById('picSummary');
+        const selectedDateTitle = document.getElementById('selectedDateTitle');
+        
+        // New elements for Tab 4
+        const volumeTableTbody = document.querySelector('#volumeTable tbody');
+        const volumeStartDate = document.getElementById('volumeStartDate');
+        const volumeEndDate = document.getElementById('volumeEndDate');
+        const applyVolumeFilter = document.getElementById('applyVolumeFilter');
+        const volumeSummaryFooter = document.getElementById('volumeSummaryFooter');
+
+        // Data storage
+        let rawData = [];              // original rows (objects)
+        let processedRows = [];         // enriched with date, timeObj, hour, minute, qty
+        let availableDates = [];        // list of unique date strings 'YYYY-MM-DD'
+        let plantGroupedData = [];       // data untuk tab1 (hasil grouping plant)
+        let currentFilterDate = 'ALL';   // untuk tab1
+        let qtyColIndex = -1;            // index for QTY column
+        let picFilterValue = '';         // current PIC filter value
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                if (e.target.id === 'resetDateFilter' || e.target.id === 'applyVolumeFilter') return;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                document.getElementById(btn.dataset.tab).classList.add('active');
+                if (processedRows.length > 0) renderActiveTab();
+            });
+        });
+
+        // ---------- Upload handler ----------
+        uploadArea.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT') fileInput.click();
+        });
+        uploadArea.addEventListener('dragover', e => e.preventDefault());
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+        fileInput.addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            fileNameDiv.innerText = `📄 ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                parseSheet(rows);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ---------- Parsing logic ----------
+        function parseSheet(rows) {
+            if (rows.length === 0) return;
+            const headerRow = rows[0];
+            const dataRows = rows.slice(1).filter(r => r.length > 5 && r[0] !== '');
+
+            // Map header index to name (lowercase)
+            const colIndex = {
+                dpTime: -1,
+                plantName: -1,
+                createdBy: -1,
+                dpDate: -1,
+                qty: -1
+            };
+            
+            // Find column indices
+            headerRow.forEach((colName, idx) => {
+                if (!colName) return;
+                const lower = colName.toString().toLowerCase().trim();
+                
+                if (lower.includes('dp time') && colIndex.dpTime === -1) colIndex.dpTime = idx;
+                if (lower.includes('plant name') && colIndex.plantName === -1) colIndex.plantName = idx;
+                if (lower.includes('created by') && colIndex.createdBy === -1) colIndex.createdBy = idx;
+                if (lower.includes('dp date') && colIndex.dpDate === -1) colIndex.dpDate = idx;
+                if (lower.includes('qty') && colIndex.qty === -1) colIndex.qty = idx;
+            });
+            
+            // Fallback positions if not found by header
+            if (colIndex.dpTime === -1) colIndex.dpTime = 3;   // kolom D (index 3)
+            if (colIndex.plantName === -1) colIndex.plantName = 6; // kolom G
+            if (colIndex.createdBy === -1) colIndex.createdBy = 39; // kolom AO (39)
+            if (colIndex.dpDate === -1) colIndex.dpDate = 2;   // kolom C
+            if (colIndex.qty === -1) colIndex.qty = 15;        // Common position for QTY (column P)
+            
+            qtyColIndex = colIndex.qty;
+
+            rawData = [];
+            processedRows = [];
+
+            dataRows.forEach(row => {
+                const dpTimeRaw = row[colIndex.dpTime];
+                const plant = row[colIndex.plantName] ? row[colIndex.plantName].toString().trim() : '';
+                const pic = row[colIndex.createdBy] ? row[colIndex.createdBy].toString().trim() : '';
+                const dpDateRaw = row[colIndex.dpDate];
+                
+                // Parse QTY value
+                let qty = 0;
+                if (colIndex.qty !== -1 && row[colIndex.qty] !== undefined) {
+                    let qtyVal = row[colIndex.qty];
+                    if (typeof qtyVal === 'string') {
+                        // Remove non-numeric characters except decimal point
+                        qtyVal = qtyVal.replace(/[^\d.]/g, '');
+                    }
+                    const num = parseFloat(qtyVal);
+                    if (!isNaN(num)) qty = Math.round(num);
+                }
+
+                if (!dpTimeRaw || !plant || !pic || !dpDateRaw) return; // skip incomplete
+
+                // Parse date
+                let dateStr = null;
+                if (dpDateRaw instanceof Date) {
+                    dateStr = dpDateRaw.toISOString().split('T')[0];
+                } else if (typeof dpDateRaw === 'number') {
+                    // Excel serial date
+                    const d = XLSX.SSF.parse_date_code(dpDateRaw);
+                    dateStr = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+                } else {
+                    const str = dpDateRaw.toString().trim();
+                    const d = new Date(str);
+                    if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
+                }
+                if (!dateStr) return;
+
+                // Parse DP Time
+                let timeStr = dpTimeRaw.toString().trim();
+                let hour = null, minute = null;
+                if (typeof dpTimeRaw === 'number') {
+                    // Excel time fraction
+                    const totalSeconds = Math.round(dpTimeRaw * 86400);
+                    const hrs = Math.floor(totalSeconds / 3600);
+                    const mins = Math.floor((totalSeconds % 3600) / 60);
+                    hour = hrs; minute = mins;
+                    timeStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
+                } else {
+                    const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+                    if (match) {
+                        hour = parseInt(match[1]); minute = parseInt(match[2]);
+                    } else return;
+                }
+
+                processedRows.push({
+                    date: dateStr,
+                    timeStr: timeStr,
+                    hour: hour,
+                    minute: minute,
+                    plantName: plant,
+                    pic: pic,
+                    qty: qty,
+                    original: row
+                });
+            });
+
+            // sort by date and time
+            processedRows.sort((a,b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return (a.hour*60+a.minute) - (b.hour*60+b.minute);
+            });
+
+            // unique dates
+            const datesSet = new Set(processedRows.map(r => r.date));
+            availableDates = Array.from(datesSet).sort();
+
+            // populate date filters
+            [dateFilterPlant, dateFilterPic].forEach(sel => {
+                sel.innerHTML = '<option value="ALL">Semua Tanggal</option>' +
+                    availableDates.map(d => `<option value="${d}">${d}</option>`).join('');
+            });
+            
+            // Initialize date range pickers for Tab 4
+            if (availableDates.length > 0) {
+                volumeStartDate.min = availableDates[0];
+                volumeStartDate.max = availableDates[availableDates.length-1];
+                volumeEndDate.min = availableDates[0];
+                volumeEndDate.max = availableDates[availableDates.length-1];
+                volumeStartDate.value = availableDates[0];
+                volumeEndDate.value = availableDates[availableDates.length-1];
+            }
+
+            // precompute plant grouped data untuk tab1
+            computePlantGroups();
+
+            renderActiveTab();
+        }
+
+        // Grouping plant per tanggal untuk analisis
+        function computePlantGroups() {
+            const groups = {};
+            processedRows.forEach(r => {
+                const key = `${r.date}|${r.plantName}`;
+                if (!groups[key]) {
+                    groups[key] = { date: r.date, plant: r.plantName, lastHour: r.hour, lastMin: r.minute, lastStr: r.timeStr };
+                } else {
+                    const cur = r.hour*60 + r.minute;
+                    const prev = groups[key].lastHour*60 + groups[key].lastMin;
+                    if (cur > prev) {
+                        groups[key].lastHour = r.hour;
+                        groups[key].lastMin = r.minute;
+                        groups[key].lastStr = r.timeStr;
+                    }
+                }
+            });
+            plantGroupedData = Object.values(groups).sort((a,b) => a.date.localeCompare(b.date) || a.plant.localeCompare(b.plant));
+        }
+
+        function renderActiveTab() {
+            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+            if (activeTab === 'tab1') renderPlantAnalysis();
+            if (activeTab === 'tab2') renderPicAnalysis();
+            if (activeTab === 'tab4') renderVolumeSummary();
+        }
+
+        // ---------- TAB 1: Plant after 15:00 ----------
+        function renderPlantAnalysis() {
+            renderDailyStatCards();
+            filterPlantTable();
+        }
+
+        function renderDailyStatCards() {
+            // Hitung stat per tanggal
+            const stats = {};
+            plantGroupedData.forEach(g => {
+                if (!stats[g.date]) {
+                    stats[g.date] = { total: 0, after15: 0 };
+                }
+                stats[g.date].total++;
+                if (g.lastHour*60 + g.lastMin > 15*60) stats[g.date].after15++;
+            });
+
+            let cardsHtml = '';
+            availableDates.forEach(date => {
+                const stat = stats[date] || { total: 0, after15: 0 };
+                const isActive = currentFilterDate === date ? 'active' : '';
+                cardsHtml += `
+                    <div class="stat-card ${isActive}" data-date="${date}">
+                        <div class="date">${date}</div>
+                        <div><span class="total">${stat.total}</span> total plant</div>
+                        <div class="after-15">⚠️ ${stat.after15} plant > 15:00</div>
+                    </div>
+                `;
+            });
+            // Tambahkan kartu untuk "Semua"
+            const allActive = currentFilterDate === 'ALL' ? 'active' : '';
+            cardsHtml += `
+                <div class="stat-card ${allActive}" data-date="ALL">
+                    <div class="date">Semua Tanggal</div>
+                    <div><span class="total">${plantGroupedData.length}</span> total entri</div>
+                    <div class="after-15">⚠️ ${plantGroupedData.filter(g => g.lastHour*60+g.lastMin > 15*60).length} plant > 15:00</div>
+                </div>
+            `;
+            dailyStatsDiv.innerHTML = cardsHtml;
+
+            // Tambahkan event listener ke kartu
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const date = card.dataset.date;
+                    currentFilterDate = date;
+                    // update dropdown
+                    dateFilterPlant.value = date === 'ALL' ? 'ALL' : date;
+                    // re-render kartu (untuk highlight) dan tabel
+                    renderDailyStatCards();
+                    filterPlantTable();
+                });
+            });
+        }
+
+        function filterPlantTable() {
+            const selectedDate = dateFilterPlant.value; // bisa 'ALL' atau tanggal
+            // jika currentFilterDate diubah lewat kartu, sinkronkan dropdown
+            if (selectedDate !== currentFilterDate) {
+                currentFilterDate = selectedDate;
+                renderDailyStatCards(); // re-highlight
+            }
+
+            let filtered = plantGroupedData;
+            if (currentFilterDate !== 'ALL') {
+                filtered = filtered.filter(g => g.date === currentFilterDate);
+            }
+
+            // Update judul
+            if (currentFilterDate === 'ALL') {
+                selectedDateTitle.innerText = 'Detail Plant untuk Semua Tanggal';
+            } else {
+                selectedDateTitle.innerText = `Detail Plant untuk Tanggal ${currentFilterDate}`;
+            }
+
+            let html = '';
+            let after15Count = 0;
+            filtered.forEach(g => {
+                const lastTotal = g.lastHour*60 + g.lastMin;
+                const isAfter15 = lastTotal > 15*60;
+                if (isAfter15) after15Count++;
+                const status = isAfter15 ? '⚠️ Aktif >15:00' : '✅ Selesai ≤15:00';
+                const badgeClass = isAfter15 ? 'badge warning' : 'badge';
+                html += `<tr>
+                    <td>${g.date}</td>
+                    <td>${g.plant}</td>
+                    <td>${g.lastStr}</td>
+                    <td><span class="${badgeClass}">${status}</span></td>
+                </tr>`;
+            });
+            plantTbody.innerHTML = html;
+            plantSummarySpan.innerText = `Ditemukan ${after15Count} plant dengan jam terakhir setelah pukul 15:00 dari total ${filtered.length} plant (per tanggal).`;
+        }
+
+        // Reset filter
+        resetDateFilterBtn.addEventListener('click', () => {
+            currentFilterDate = 'ALL';
+            dateFilterPlant.value = 'ALL';
+            renderDailyStatCards();
+            filterPlantTable();
+        });
+
+        dateFilterPlant.addEventListener('change', () => {
+            currentFilterDate = dateFilterPlant.value;
+            renderDailyStatCards();
+            filterPlantTable();
+        });
+
+        // ---------- TAB 2: Analisis PIC per hari (dengan filter PIC) ----------
+        function renderPicAnalysis() {
+            const selectedDate = dateFilterPic.value;
+            let filtered = processedRows;
+            
+            // Filter by date
+            if (selectedDate !== 'ALL') {
+                filtered = filtered.filter(r => r.date === selectedDate);
+            }
+            
+            // Filter by PIC name
+            if (picFilterValue) {
+                const filterLower = picFilterValue.toLowerCase();
+                filtered = filtered.filter(r => 
+                    r.pic.toLowerCase().includes(filterLower)
+                );
+            }
+
+            // group by date & pic
+            const picGroups = {};
+            filtered.forEach(r => {
+                const key = `${r.date}|${r.pic}`;
+                if (!picGroups[key]) {
+                    picGroups[key] = {
+                        date: r.date,
+                        pic: r.pic,
+                        firstHour: r.hour,
+                        firstMin: r.minute,
+                        firstStr: r.timeStr,
+                        lastHour: r.hour,
+                        lastMin: r.minute,
+                        lastStr: r.timeStr,
+                        count: 1,
+                        totalQty: r.qty
+                    };
+                } else {
+                    const cur = r.hour*60 + r.minute;
+                    const first = picGroups[key].firstHour*60 + picGroups[key].firstMin;
+                    const last = picGroups[key].lastHour*60 + picGroups[key].lastMin;
+                    if (cur < first) {
+                        picGroups[key].firstHour = r.hour;
+                        picGroups[key].firstMin = r.minute;
+                        picGroups[key].firstStr = r.timeStr;
+                    }
+                    if (cur > last) {
+                        picGroups[key].lastHour = r.hour;
+                        picGroups[key].lastMin = r.minute;
+                        picGroups[key].lastStr = r.timeStr;
+                    }
+                    picGroups[key].count++;
+                    picGroups[key].totalQty += r.qty;
+                }
+            });
+
+            const picList = Object.values(picGroups).sort((a,b) => a.date.localeCompare(b.date) || a.pic.localeCompare(b.pic));
+
+            let html = '';
+            let totalDP = 0;
+            let totalQty = 0;
+            
+            picList.forEach(p => {
+                totalDP += p.count;
+                totalQty += p.totalQty;
+                html += `<tr>
+                    <td>${p.date}</td>
+                    <td>${p.pic || '-'}</td>
+                    <td>${p.firstStr}</td>
+                    <td>${p.lastStr}</td>
+                    <td>${p.count}</td>
+                    <td>${p.totalQty.toLocaleString('id-ID')}</td>
+                </tr>`;
+            });
+            
+            picTbody.innerHTML = html;
+            
+            // Show filter info in summary
+            let filterInfo = '';
+            if (picFilterValue) {
+                filterInfo = ` (Filter: "${picFilterValue}")`;
+            }
+            
+            picSummaryDiv.innerHTML = `
+                📌 Total ${picList.length} entri PIC per hari${filterInfo}.
+                <br>📊 Total DP: <strong>${totalDP.toLocaleString('id-ID')}</strong> | Total Qty: <strong>${totalQty.toLocaleString('id-ID')}</strong>
+            `;
+        }
+
+        // ---------- TAB 4: Volume per Head (new tab) ----------
+        function renderVolumeSummary() {
+            const startDate = volumeStartDate.value;
+            const endDate = volumeEndDate.value;
+            
+            // Validate date range
+            if (!startDate || !endDate || startDate > endDate) {
+                volumeSummaryFooter.textContent = "Total Volume: 0";
+                volumeTableTbody.innerHTML = `<tr><td colspan="2">Silakan pilih rentang tanggal yang valid</td></tr>`;
+                return;
+            }
+
+            // Filter by date range
+            const filtered = processedRows.filter(r => 
+                r.date >= startDate && r.date <= endDate
+            );
+
+            // Group by PIC
+            const picGroups = {};
+            filtered.forEach(r => {
+                if (!picGroups[r.pic]) {
+                    picGroups[r.pic] = {
+                        pic: r.pic,
+                        totalQty: 0
+                    };
+                }
+                picGroups[r.pic].totalQty += r.qty;
+            });
+
+            // Convert to array and sort by totalQty descending
+            const picList = Object.values(picGroups)
+                .sort((a, b) => b.totalQty - a.totalQty);
+
+            // Render table
+            let html = '';
+            let grandTotal = 0;
+            picList.forEach(p => {
+                grandTotal += p.totalQty;
+                html += `<tr>
+                    <td>${p.pic || '-'}</td>
+                    <td>${p.totalQty.toLocaleString('id-ID')}</td>
+                </tr>`;
+            });
+            
+            volumeTableTbody.innerHTML = html;
+            volumeSummaryFooter.textContent = `Total Volume: ${grandTotal.toLocaleString('id-ID')}`;
+            
+            // Update summary
+            document.getElementById('volumeSummary').innerHTML = `
+                📌 Analisis volume pengiriman per PIC (Created By) berdasarkan total kuantitas (Qty)
+                <br>📊 Total PIC: <strong>${picList.length}</strong> | Total Volume: <strong>${grandTotal.toLocaleString('id-ID')}</strong>
+            `;
+        }
+
+        // Event listeners for PIC filters
+        dateFilterPic.addEventListener('change', renderPicAnalysis);
+        
+        // PIC name filter
+        picFilterInput.addEventListener('input', (e) => {
+            picFilterValue = e.target.value.trim();
+            // Debounce to prevent excessive re-renders
+            clearTimeout(window.picFilterTimeout);
+            window.picFilterTimeout = setTimeout(() => {
+                renderPicAnalysis();
+            }, 300);
+        });
+        
+        // Event listener for volume filter
+        applyVolumeFilter.addEventListener('click', renderVolumeSummary);
+        volumeStartDate.addEventListener('change', () => {
+            if (volumeStartDate.value > volumeEndDate.value) {
+                volumeEndDate.value = volumeStartDate.value;
+            }
+        });
+        volumeEndDate.addEventListener('change', () => {
+            if (volumeEndDate.value < volumeStartDate.value) {
+                volumeStartDate.value = volumeEndDate.value;
+            }
+        });
+
+        // Initialize volume summary if Tab 4 is active initially (though it won't be)
+        if (document.querySelector('.tab-btn[data-tab="tab4"].active')) {
+            renderVolumeSummary();
+        }
+
+    })();
+</script>
+</body>
+</html>
